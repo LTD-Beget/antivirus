@@ -1,0 +1,79 @@
+syntax = 'proto3';
+
+package beget.antivirus.v1.antivirus;
+
+service AntivirusService {
+    rpc getViruses(GetVirusesRequest) returns (GetVirusesResponse) {
+        option (google.api.http).get = "antivirus/v1/get";
+    }
+
+    rpc heal(HealRequest) returns (HealResponse) {
+        option (google.api.http).get = "antivirus/v1/heal";
+    }
+
+    rpc restore(RestoreRequest) returns (RestoreResponse) {
+        option (google.api.http).get = "antivirus/v1/restore";
+    }
+}
+
+message GetVirusesRequest {
+    // Путь к папке для проверки наличия в ней вирусов
+    string path = 1;
+}
+
+message GetVirusesResponse {
+    message FilesFragments {
+        // Путь к файлу
+        string path = 1;
+        // Небольшой, около 100 символов, участок кода на который среагировал антивирус
+        string fragment = 2;
+    }
+    // Список файлов с подозрительным кодом
+    repeated FilesFragments files = 1;
+}
+
+message HealRequest {
+    // Путь к папке для удаления присутствующих в ней вирусов
+    string path = 1;
+}
+
+message HealResponse {
+    oneof {
+        Success success = 1;
+        Error error = 2;
+    }
+
+    message Success {
+        message fileDiff {
+            string path = 1;
+            string diff = 2;
+        }
+        // Разница в файлах после удаления вирусов
+        repeated fileDiff files = 1;
+    }
+
+    message Error {
+        string cause = 1;
+    }
+}
+
+message RestoreRequest {
+    // Путь к папке для восстановления файлов в состояние до лечения
+    string path = 1;
+    // Если передан True, то восстановить все файлы
+    bool restore_all = 2;
+    // Список файлов для восстновления, може быть пустым. Используется только если restore_all == False
+    repeated string files_list = 3;
+}
+message RestoreResponse {
+    oneof result {
+        Success success = 1;
+        Error error = 2;
+    }
+
+    message Success {}
+
+    message Error {
+        string cause = 1;
+    }
+}
