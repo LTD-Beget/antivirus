@@ -1,79 +1,127 @@
 syntax = 'proto3';
 
-package beget.antivirus.v1.antivirus;
+package beget.avh.v1.antivirus;
+
+import "google/protobuf/timestamp.proto";
 
 service AntivirusService {
-    rpc getViruses(GetVirusesRequest) returns (GetVirusesResponse) {
-        option (google.api.http).get = "antivirus/v1/get";
-    }
+  // Вылечить
+  rpc heal (HealRequest) returns (HealResponse);
 
-    rpc heal(HealRequest) returns (HealResponse) {
-        option (google.api.http).get = "antivirus/v1/heal";
-    }
+  // Восстановить вылеченное
+  rpc revert (RevertRequest) returns (RevertResponse);
 
-    rpc restore(RestoreRequest) returns (RestoreResponse) {
-        option (google.api.http).get = "antivirus/v1/restore";
-    }
-}
-
-message GetVirusesRequest {
-    // Путь к папке для проверки наличия в ней вирусов
-    string path = 1;
-}
-
-message GetVirusesResponse {
-    message FilesFragments {
-        // Путь к файлу
-        string path = 1;
-        // Небольшой, около 100 символов, участок кода на который среагировал антивирус
-        string fragment = 2;
-    }
-    // Список файлов с подозрительным кодом
-    repeated FilesFragments files = 1;
+  // Получить список заражённых и вылеченных файлов
+  rpc getList (GetListRequest) returns (GetListResponse);
 }
 
 message HealRequest {
-    // Путь к папке для удаления присутствующих в ней вирусов
-    string path = 1;
+  oneof condition {
+    // Вылечить один файл
+    ByFile by_file = 1;
+    // Вылечить сайт(ы)
+    BySite by_site = 2;
+  }
 }
 
 message HealResponse {
-    oneof {
-        Success success = 1;
-        Error error = 2;
-    }
+  oneof result {
+    InfectedSite infected_site = 1;
+    Error error = 2;
+  }
 
-    message Success {
-        message fileDiff {
-            string path = 1;
-            string diff = 2;
-        }
-        // Разница в файлах после удаления вирусов
-        repeated fileDiff files = 1;
-    }
-
-    message Error {
-        string cause = 1;
-    }
+  enum Error {
+    INTERNAL_ERROR = 0;
+  }
 }
 
-message RestoreRequest {
-    // Путь к папке для восстановления файлов в состояние до лечения
-    string path = 1;
-    // Если передан True, то восстановить все файлы
-    bool restore_all = 2;
-    // Список файлов для восстновления, може быть пустым. Используется только если restore_all == False
-    repeated string files_list = 3;
+message RevertRequest {
+  oneof condition {
+    // Вылечить один файл
+    ByFile by_file = 1;
+    // Вылечить сайт(ы)
+    BySite by_site = 2;
+  }
 }
-message RestoreResponse {
-    oneof result {
-        Success success = 1;
-        Error error = 2;
+
+message RevertResponse {
+  oneof result {
+    InfectedSite infected_site = 1;
+    Error error = 2;
+  }
+
+  enum Error {
+    INTERNAL_ERROR = 0;
+  }
+}
+
+message GetListRequest {
+}
+
+message GetListResponse {
+  oneof result {
+    SiteList site_list = 1;
+    Error error = 2;
+  }
+
+  message SiteList {
+    // Сайты, в которых есть вирусы
+    repeated InfectedSite infected_site = 1;
+
+    // Дата последнего поиска вирусов
+    google.protobuf.Timestamp search_date = 2;
+  }
+
+  enum Error {
+    INTERNAL_ERROR = 0;
+  }
+}
+
+message InfectedSite {
+  string site_id = 1;
+
+  string site_name = 2;
+
+  repeated InfectedFile infected_file = 3;
+
+  message InfectedFile {
+    string file_path = 1;
+
+    oneof file_status {
+      Healed healed = 2;
+      Infected infected = 3;
     }
 
-    message Success {}
-
-    message Error {
-        string cause = 1;
+    message Healed {
+      File backup_file = 1;
+      File current_file = 2;
     }
+
+    message Infected {
+      repeated InfectedCode infected_code = 1;
+    }
+
+    message InfectedCode {
+      // номер строки
+      string start = 1;
+      // код
+      string code = 2;
+    }
+  }
+
+}
+
+message ByFile {
+  string site_id = 1;
+  string file_path = 2;
+}
+
+message BySite {
+  repeated string site_id = 1;
+}
+
+message File {
+  string name = 1;
+  string ext = 2;
+  bytes data = 3;
 }
