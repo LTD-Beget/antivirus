@@ -1,0 +1,57 @@
+syntax = 'proto3';
+
+package beget.antivirus.v1.antivirus;
+
+import "proto/v1/structures.proto";
+import "google/api/annotations.proto";
+
+
+service AntivirusService {
+    // Запрос на лечение
+    rpc heal (HealRequest) returns (HealResponse){
+        option (google.api.http) = {
+            post: "/v1/antivirus/heal"
+            body: "*"
+        };
+    };
+    // Запрос на восстановление вылеченных файлов
+    rpc revert (RevertRequest) returns (RevertResponse){
+        option (google.api.http) = {
+            post: "/v1/antivirus/revert"
+            body: "*"
+        };
+    }
+    // Получить список зараженных файлов и вирусы в них
+    rpc getInfectedSites (GetInfectedSitesRequest) returns (GetInfectedSitesResponse) {
+        option (google.api.http) = {
+            get: "/v1/antivirus/infected-sites"
+        };
+    }
+
+}
+
+message HealRequest {
+    uint32 report_id = 1;
+    repeated uint32 malware_id = 2;
+}
+
+message HealResponse {
+    uint32 report_id = 1;
+    repeated MalwareActionResult result = 2;
+}
+
+message RevertRequest {
+    uint32 report_id = 1;
+    repeated uint32 malvare_id = 2;
+}
+
+message RevertResponse {
+    uint32 report_id = 1;
+    repeated MalwareActionResult result = 2;
+}
+
+message GetInfectedSitesRequest {}
+
+message GetInfectedSitesResponse {
+    repeated InfectedSite infected_site = 1;
+}
