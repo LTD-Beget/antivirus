@@ -1,0 +1,49 @@
+syntax = 'proto3';
+
+package beget.antivirus.v1.structures;
+// Результат лечения и востановления файлов
+message MalwareActionResult {
+    uint32 malware_id = 1;
+    string file_name = 2;
+    Error error = 3;
+}
+
+// Структура зараженного файла
+message InfectedSite {
+    uint32 report_id = 1;
+    uint32 site_id = 2;
+    string site_name = 3;
+    // DateTime::RFC3339
+    string virus_detection_time = 4;
+
+    repeated Malware malware = 5;
+
+    // Структура вируса
+    message Malware {
+        uint32 malware_id = 1;
+        string file_name = 2;
+        string file_line = 3;
+        string signature = 4;
+        bool is_healed = 5;
+    }
+}
+
+enum Status {
+    COMPLETED  = 0;
+    ERROR = 1;
+}
+
+message Error {
+    string message = 1;
+    ErrorCode error_code = 2;
+}
+
+enum ErrorCode {
+    COMMON_ERROR = 0;
+    FILE_NOT_FOUND = 1;
+    PERMISSION_DENIED = 2;
+}
+message MalwareActionResults {
+   repeated MalwareActionResult results = 1;
+}
+
