@@ -2,7 +2,7 @@ syntax = 'proto3';
 
 package beget.antivirus.v1.antivirus;
 
-import "proto/v1/structures.proto";
+import "antivirus/proto/v1/structures.proto";
 import "google/api/annotations.proto";
 
 
@@ -37,7 +37,7 @@ message HealRequest {
 
 message HealResponse {
     uint32 report_id = 1;
-    repeated MalwareActionResult result = 2;
+    repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
 }
 
 message RevertRequest {
@@ -47,11 +47,11 @@ message RevertRequest {
 
 message RevertResponse {
     uint32 report_id = 1;
-    repeated MalwareActionResult result = 2;
+    repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
 }
 
 message GetInfectedSitesRequest {}
 
 message GetInfectedSitesResponse {
-    repeated InfectedSite infected_site = 1;
+    repeated beget.antivirus.v1.structures.InfectedSite infected_site = 1;
 }
