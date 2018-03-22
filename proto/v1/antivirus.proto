@@ -37,21 +37,33 @@ message HealRequest {
 
 message HealResponse {
     uint32 report_id = 1;
-    repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
+    beget.antivirus.v1.structures.Status status = 2;
+    oneof result {
+        string error_message = 3;
+        MalwareActionResults results = 4;
+    }
 }
 
 message RevertRequest {
     uint32 report_id = 1;
-    repeated uint32 malvare_id = 2;
+    repeated uint32 malware_id = 2;
 }
 
 message RevertResponse {
     uint32 report_id = 1;
-    repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
+    beget.antivirus.v1.structures.Status status = 2;
+    oneof result {
+        string error_message = 3;
+        MalwareActionResults results = 4;
+    }
 }
 
 message GetInfectedSitesRequest {}
 
 message GetInfectedSitesResponse {
     repeated beget.antivirus.v1.structures.InfectedSite infected_site = 1;
+}
+
+message MalwareActionResults {
+    repeated beget.antivirus.v1.structures.MalwareActionResult result = 1;
 }
