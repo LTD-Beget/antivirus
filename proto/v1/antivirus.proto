@@ -46,7 +46,7 @@ message HealResponse {
 
 message RevertRequest {
     uint32 report_id = 1;
-    repeated uint32 malvare_id = 2;
+    repeated uint32 malware_id = 2;
 }
 
 message RevertResponse {
