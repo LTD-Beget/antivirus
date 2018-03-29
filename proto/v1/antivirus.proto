@@ -37,10 +37,7 @@ message HealRequest {
 
 message HealResponse {
     uint32 report_id = 1;
-    oneof reuslt {
-        beget.antivirus.v1.structures.MalwareActionResults result = 2;
-        string error_message = 3;
-    }
+    repeated beget.antivirus.v1.structures.MalwareActionResult results = 2;
 }
 
 message RevertRequest {
@@ -50,10 +47,7 @@ message RevertRequest {
 
 message RevertResponse {
     uint32 report_id = 1;
-    oneof reuslt {
-        beget.antivirus.v1.structures.MalwareActionResults result = 2;
-        string error_message = 3;
-    }
+    repeated beget.antivirus.v1.structures.MalwareActionResult results = 1;
 }
 
 message GetInfectedSitesRequest {}
