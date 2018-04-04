@@ -8,14 +8,14 @@ import "google/api/annotations.proto";
 
 service AntivirusService {
     // Запрос на лечение
-    rpc heal (HealRequest) returns (HealResponse){
+    rpc heal (HealRequest) returns (HealResponse) {
         option (google.api.http) = {
             post: "/v1/antivirus/heal"
             body: "*"
         };
     };
     // Запрос на восстановление вылеченных файлов
-    rpc revert (RevertRequest) returns (RevertResponse){
+    rpc revert (RevertRequest) returns (RevertResponse) {
         option (google.api.http) = {
             post: "/v1/antivirus/revert"
             body: "*"
@@ -31,13 +31,21 @@ service AntivirusService {
 }
 
 message HealRequest {
-    uint32 report_id = 1;
-    repeated uint32 malware_id = 2;
+    repeated HealReport report = 1;
+
+    message HealReport {
+        uint32 report_id = 1;
+        repeated uint32 malware_id = 2;
+    }
 }
 
 message HealResponse {
-    uint32 report_id = 1;
-    repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
+    repeated HealResult result = 1;
+
+    message HealResult {
+        uint32 report_id = 1;
+        repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
+    }
 }
 
 message RevertRequest {
@@ -50,7 +58,8 @@ message RevertResponse {
     repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
 }
 
-message GetInfectedSitesRequest {}
+message GetInfectedSitesRequest {
+}
 
 message GetInfectedSitesResponse {
     repeated beget.antivirus.v1.structures.InfectedSite infected_site = 1;
