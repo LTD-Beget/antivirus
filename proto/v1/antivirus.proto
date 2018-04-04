@@ -31,7 +31,7 @@ service AntivirusService {
 }
 
 message HealRequest {
-    repeated HealReport reports = 1;
+    repeated HealReport report = 1;
 
     message HealReport {
         uint32 report_id = 1;
@@ -40,7 +40,7 @@ message HealRequest {
 }
 
 message HealResponse {
-    repeated HealResult results = 1;
+    repeated HealResult result = 1;
 
     message HealResult {
         uint32 report_id = 1;
