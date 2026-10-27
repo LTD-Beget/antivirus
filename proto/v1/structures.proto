@@ -32,10 +32,164 @@ message Error {
     string message = 1;
     ErrorCode error_code = 2;
 
+    // COMMON_ERROR = 0 совпадает со значением по умолчанию, поэтому признак ошибки - наличие error, а не код
     enum ErrorCode {
         COMMON_ERROR = 0;
         FILE_NOT_FOUND = 1;
         PERMISSION_DENIED = 2;
     }
 
+}
+
+// Сайт клиента с состоянием антивируса
+message Site {
+    uint32 site_id = 1;
+    string site_name = 2;
+    // Последняя проверка сайта любого статуса. Пусто, если сайт не проверялся
+    Scan last_scan = 3;
+    // Текущий отчёт: новейший завершённый, по нему идут лечение и откат. 0, если его нет
+    uint32 current_report_id = 4;
+    // Найденные файлы текущего отчёта
+    repeated InfectedSite.Malware malware = 5;
+    // Последний заказ лечения или отката по сайту, без файлов. Пусто, если заказов не было
+    Order last_order = 6;
+    // Что с сайтом сейчас. Итог проверки - в last_scan
+    ScanStatus scan_status = 7;
+
+    enum ScanStatus {
+        SCAN_STATUS_UNSPECIFIED = 0;
+        // Не в очереди и не проверяется
+        IDLE = 1;
+        // Ждёт в ручной проверке аккаунта: проверка в очереди или уже идёт, но до сайта
+        // ещё не дошла (сайты одной проверки сканируются по одному). Сюда же сайт возвращается,
+        // если его скан убило обслуживание сканера в 01:00
+        QUEUED = 2;
+        // Проверяется сейчас, ручной или плановой проверкой. Важнее QUEUED: сайт из очереди,
+        // который прямо сейчас сканирует плановый прогон, тоже IN_PROGRESS
+        IN_PROGRESS = 3;
+    }
+}
+
+// Проверка одного сайта. Одна проверка - один отчёт
+message Scan {
+    // Совпадает с report_id
+    uint32 scan_id = 1;
+    Status status = 2;
+    Source source = 3;
+    // DateTime::RFC3339
+    string started_at = 4;
+    // DateTime::RFC3339, пусто, пока проверка не завершена
+    string completed_at = 5;
+    uint32 malware_count = 6;
+    // Ручная проверка аккаунта, которую закрыл этот отчёт. 0 для плановой
+    uint32 scan_task_id = 7;
+
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        IN_PROGRESS = 1;
+        COMPLETED = 2;
+        ERROR = 3;
+    }
+
+    enum Source {
+        SOURCE_UNSPECIFIED = 0;
+        // Плановая проверка по расписанию
+        SCHEDULED = 1;
+        // Отчёт закрыл ручную проверку: её собственный или плановый, который шёл в это же время
+        MANUAL = 2;
+    }
+}
+
+// Ручная проверка выбранных сайтов или всех сайтов аккаунта
+message ScanTask {
+    uint32 scan_task_id = 1;
+    Status status = 2;
+    bool notify = 3;
+    // DateTime::RFC3339
+    string created_at = 4;
+    // DateTime::RFC3339, последний запуск. Пусто, пока проверка в очереди, в том числе при повторной постановке
+    string started_at = 5;
+    // DateTime::RFC3339, пусто, пока проверка не завершена
+    string finished_at = 6;
+    // Сколько сайтов в задаче и у скольких уже есть итог (отчёт или ошибка)
+    uint32 sites_total = 7;
+    uint32 sites_done = 8;
+    // Сайты задачи
+    repeated uint32 site_id = 9;
+    // Сколько сайтов из sites_done закончились ошибкой
+    uint32 sites_failed = 10;
+
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        // Ждёт свободного слота на сервере или конца окна обслуживания сканера.
+        // Задача, сканы которой убило обслуживание в 01:00, один раз возвращается сюда
+        QUEUED = 1;
+        // Отправлена сканеру на сервере
+        RUNNING = 2;
+        // У всех сайтов есть итог, хотя бы один проверен. Ошибки по сайтам - в sites_failed
+        COMPLETED = 3;
+        // Ни один сайт не проверен: сканер не принял проверку, на сервере старый сканер,
+        // таймаут без результатов, рестарт сканера или сканер недоступен дольше 12 ч в очереди
+        ERROR = 4;
+    }
+}
+
+// Заказ на лечение или откат файлов одного сайта
+message Order {
+    uint32 order_id = 1;
+    uint32 report_id = 2;
+    // В таблице order колонки нет, сопоставляется по логину и site_user
+    uint32 site_id = 3;
+    Type type = 4;
+    // COMPLETED - сканер вернул результат, успех по файлам смотреть в file[].status.
+    // ERROR - сканер вернул ошибку, вызов оборвался или заказ завис и закрыт по таймауту
+    Status status = 5;
+    // DateTime::RFC3339
+    string created_at = 6;
+    // DateTime::RFC3339, пусто, пока заказ не завершён
+    string completed_at = 7;
+    // Заполняется только в getOrders
+    repeated File file = 8;
+
+    enum Type {
+        TYPE_UNSPECIFIED = 0;
+        HEAL = 1;
+        REVERT = 2;
+    }
+
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        IN_PROGRESS = 1;
+        COMPLETED = 2;
+        ERROR = 3;
+    }
+
+    message File {
+        uint32 malware_id = 1;
+        string file_name = 2;
+        Status status = 3;
+        // Есть только у ERROR. Признак ошибки - наличие error, а не код
+        Error error = 4;
+        // Итог неизвестен: вызов оборвался или файла нет в ответе сканера.
+        // Повторно в этом отчёте файл не лечится, до следующей проверки сайта
+        bool result_unknown = 5;
+    }
+}
+
+// Отказ heal или revert целиком
+message ActionError {
+    Code code = 1;
+    string message = 2;
+
+    enum Code {
+        CODE_UNSPECIFIED = 0;
+        // По аккаунту уже идёт лечение или откат
+        HEAL_IN_PROGRESS = 1;
+        // У аккаунта идёт ручная проверка или сайт прямо сейчас сканируется
+        SCAN_IN_PROGRESS = 2;
+        // Окно обслуживания сканера, 00:55–01:15 по времени сервера. Только heal, откат в окне работает
+        SCANNER_MAINTENANCE = 3;
+        // Файлов в запросе больше лимита, лечение надо разбить на запросы
+        TOO_MANY_FILES = 4;
+    }
 }
