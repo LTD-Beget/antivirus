@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 
 service AntivirusService {
     // Запрос на лечение
+    // Синхронный. Отказ целиком (идёт другое лечение, проверка, обслуживание сканера, слишком много файлов) - в error
     rpc heal (HealRequest) returns (HealResponse) {
         option (google.api.http) = {
             post: "/v1/antivirus/heal"
@@ -15,6 +16,7 @@ service AntivirusService {
         };
     };
     // Запрос на восстановление вылеченных файлов
+    // Отказ целиком - в error. В окне обслуживания сканера работает: откат не трогает контейнер
     rpc revert (RevertRequest) returns (RevertResponse) {
         option (google.api.http) = {
             post: "/v1/antivirus/revert"
@@ -22,9 +24,33 @@ service AntivirusService {
         };
     }
     // Получить список зараженных файлов и вирусы в них
+    // Устарел, заменяется getSites. Живёт, пока фронт не переведёт на getSites баннеры
     rpc getInfectedSites (GetInfectedSitesRequest) returns (GetInfectedSitesResponse) {
         option (google.api.http) = {
             get: "/v1/antivirus/infected-sites"
+        };
+    }
+    // Все сайты клиента со статусом (в очереди, проверяется), последней проверкой,
+    // найденными файлами и последним заказом, плюс ручные проверки аккаунта в очереди и в работе.
+    // Фронт перечитывает ручку по событиям antivirus.scan.* и antivirus.site.scan.*
+    rpc getSites (GetSitesRequest) returns (GetSitesResponse) {
+        option (google.api.http) = {
+            get: "/v1/antivirus/sites"
+        };
+    }
+    // Поставить в очередь ручную проверку выбранных сайтов или всех сайтов аккаунта.
+    // Запуск пробуется в том же запросе, так что задача в ответе может быть уже RUNNING или ERROR.
+    // Ход проверки приходит событиями antivirus.scan.* и antivirus.site.scan.* через svc-emitter
+    rpc startScan (StartScanRequest) returns (StartScanResponse) {
+        option (google.api.http) = {
+            post: "/v1/antivirus/scans"
+            body: "*"
+        };
+    }
+    // Заказы лечения и отката с результатом по каждому файлу
+    rpc getOrders (GetOrdersRequest) returns (GetOrdersResponse) {
+        option (google.api.http) = {
+            get: "/v1/antivirus/orders"
         };
     }
 
@@ -41,10 +67,14 @@ message HealRequest {
 
 message HealResponse {
     repeated HealResult result = 1;
+    // Отказ целиком, заказ не создан и result пуст. Ошибки отдельных файлов - в result[].error
+    beget.antivirus.v1.structures.ActionError error = 2;
 
     message HealResult {
         uint32 report_id = 1;
         repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
+        // Заказ лечения по этому отчёту, его можно перечитать через getOrders
+        uint32 order_id = 3;
     }
 }
 
@@ -56,6 +86,10 @@ message RevertRequest {
 message RevertResponse {
     uint32 report_id = 1;
     repeated beget.antivirus.v1.structures.MalwareActionResult result = 2;
+    // Заказ отката, его можно перечитать через getOrders
+    uint32 order_id = 3;
+    // Отказ целиком, заказ не создан и result пуст
+    beget.antivirus.v1.structures.ActionError error = 4;
 }
 
 message GetInfectedSitesRequest {
@@ -63,4 +97,62 @@ message GetInfectedSitesRequest {
 
 message GetInfectedSitesResponse {
     repeated beget.antivirus.v1.structures.InfectedSite infected_site = 1;
+}
+
+message GetSitesRequest {
+}
+
+message GetSitesResponse {
+    repeated beget.antivirus.v1.structures.Site site = 1;
+    // Ручные проверки аккаунта в очереди и в работе
+    repeated beget.antivirus.v1.structures.ScanTask active_scan_task = 2;
+}
+
+message StartScanRequest {
+    // Отправить письмо по окончании проверки
+    bool notify = 1;
+    // Сайты для проверки. Пусто - все сайты аккаунта.
+    // В задачу не попадают сайты без site_user и сайты, которые уже стоят в другой ручной проверке
+    repeated uint32 site_id = 2;
+}
+
+message StartScanResponse {
+    oneof result {
+        beget.antivirus.v1.structures.ScanTask scan_task = 1;
+        Error error = 2;
+    }
+
+    message Error {
+        Code code = 1;
+
+        enum Code {
+            CODE_UNSPECIFIED = 0;
+            // Тариф без ImunifyAV+ (нет группы antivirus или dedicated_server)
+            // или ручная проверка выключена флагом
+            NOT_AVAILABLE = 1;
+            // Все запрошенные сайты уже стоят в другой ручной проверке
+            ALREADY_IN_PROGRESS = 2;
+            // По аккаунту идёт лечение или откат
+            HEAL_IN_PROGRESS = 3;
+            // Превышена дисковая квота аккаунта
+            QUOTA_EXCEEDED = 4;
+            // Клиент заблокирован, удалён, переезжает или не завершил регистрацию
+            CUSTOMER_BLOCKED = 5;
+            // Сработал лимит частоты ручных проверок
+            TOO_OFTEN = 6;
+            // У аккаунта нет сайтов
+            NO_SITES = 7;
+            // Сайта нет, он чужой или у него нет site_user
+            SITE_NOT_FOUND = 8;
+        }
+    }
+}
+
+message GetOrdersRequest {
+    // ?order_id=1&order_id=2, не больше 100. Чужие и неизвестные id не возвращаются
+    repeated uint32 order_id = 1;
+}
+
+message GetOrdersResponse {
+    repeated beget.antivirus.v1.structures.Order order = 1;
 }
